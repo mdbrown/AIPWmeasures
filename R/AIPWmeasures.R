@@ -13,8 +13,8 @@
 #' @param design either "CCH" for case-cohort or "NCC" for nested case control specifying the subcohort design used.
 #' @param calculate.sd  should analytic standard errors be calculated.
 #' @param smoothing.par nearest neighbor smoothing parameter used in locfit (default = 0.7)
-#' @param pnf.threshold  numeric threshold value for which to calculate PNF(bb)
-#' @param pcf.threshold  numeric threshold value for which to calculate PCF(vv)
+#' @param pnf.threshold value used to calculate proportion needed to follow (PNF) such that pnf.threshold percent of the cases are classified high risk.
+#' @param pcf.threshold value used to calculate proportion of cases followed (PCF) if pcf.threshold percent of the population are classified high risk.
 #' @param ncc.nmatch For design = "NCC", specify the number of controls matched per case.
 #'
 #' @note variance calculations are unavailable for the NB measure.
@@ -39,7 +39,7 @@
 #'              smoothing.par = 0.9,
 #'              calculate.sd  = TRUE,
 #'              pnf.threshold = 0.85,
-#'              pcf.threshold = 0.8)
+#'              pcf.threshold = 0.2)
 #'
 #'
 #'#simulated data from a ncc design with nmatch = 2
@@ -55,7 +55,7 @@
 #'              smoothing.par = 0.9,
 #'              calculate.sd  = TRUE,
 #'              pnf.threshold = 0.85,
-#'              pcf.threshold = 0.8,
+#'              pcf.threshold = 0.2,
 #'              ncc.nmatch = 2)
 #'
 #' @import locfit
@@ -70,8 +70,8 @@ AIPWmeasures <- function(time,event, X, subcohort,
                          design= c("CCH", "NCC"),
                          calculate.sd = TRUE,
                          smoothing.par = 0.7,
-                         pnf.threshold = NULL,
-                         pcf.threshold = NULL,
+                         pnf.threshold = 0.5,
+                         pcf.threshold = 0.2,
                          ncc.nmatch  = NULL)
 {
 
@@ -80,6 +80,21 @@ AIPWmeasures <- function(time,event, X, subcohort,
   weight.method <- match.arg(weight.method)
   design  <- match.arg(design)
 
+  stopifnot(is.numeric(time))
+  stopifnot(is.indicator(event))
+  stopifnot(is.indicator(subcohort))
+  stopifnot(length(time) == nrow(X))
+  stopifnot(length(event) == nrow(X))
+  if(weight.method == "Aug") if(missing(aug.weights.x)) stop("aug.weights.x is needed if weight.method = 'Aug'")
+  stopifnot(all(risk.threshold > 0))
+  stopifnot(all(risk.threshold < 1))
+  stopifnot(pcf.threshold >=0); stopifnot(pcf.threshold <= 1)
+  stopifnot(pnf.threshold >=0); stopifnot(pnf.threshold <= 1)
+
+  stopifnot(is.numeric(landmark.time))
+
+  stopifnot(is.logical(calculate.sd))
+  if(design == "NCC") if(missing(ncc.nmatch)) stop("ncc.nmatch must be set when design = 'NCC'")
 
 
   ###### end checks
@@ -99,10 +114,15 @@ AIPWmeasures <- function(time,event, X, subcohort,
   N = nrow(cohortdata)
   nn.par = smoothing.par
   CalVar = calculate.sd
+
+
+
   mytpr = pnf.threshold # for PNF V(TPR = 0.85)
-  vv = pcf.threshold # for PCF TPR(v = 0.8)
+  vv = 1-pcf.threshold # for PCF TPR(v = 0.8)
   AugWeightsX = aug.weights.x
   nmatch = ncc.nmatch
+
+
 
   if (method == 'True'){
     if (design == 'CCH')  {
@@ -200,9 +220,16 @@ AIPWmeasures <- function(time,event, X, subcohort,
 
   if (!is.null(vv)) {
     pcf = EstRTvp.FUN(RT.out,vv,'v','TPR')
-    pnf = EstRTvp.FUN(RT.out,mytpr,'TPR','v')
+  }else{
+    pcf = NA
+    pcf.threshold <- NA
   }
-
+  if (!is.null(mytpr)) {
+    pnf = EstRTvp.FUN(RT.out,mytpr,'TPR','v')
+  }else{
+    pnf = NA
+    pnf.threshold <- NA
+  }
 
   NBp.out = NULL
 
@@ -214,10 +241,9 @@ AIPWmeasures <- function(time,event, X, subcohort,
     }
   }
 
-
   #est = data.frame(c(betahat), AUC, IDI, ITPR,IFPR,RTvp.out,pcf,pnf, NB = NBp.out )
   out = data.frame(measure = c(paste0("coef.x", 1:length(betahat)),
-                               "AUC", "IDI", "ITPR", "IFPR", typey, "PCF", "PNF", rep("NB", length(risk.threshold))),
+                               "AUC", "IDI", "ITPR", "IFPR", typey,"PCF", "PNF", rep("NB", length(risk.threshold))),
                    threshold = c(rep(NA, length(betahat)), NA, NA, NA, NA, vp, pcf.threshold, pnf.threshold, risk.threshold),
                    estimate = c(c(betahat), AUC, IDI, ITPR,IFPR,RTvp.out,pcf,pnf, NBp.out ))
 

@@ -806,7 +806,7 @@ dAcc.FUN <- function(uu0, uu=SE.yy, A.uu = Sp.yy, bw=NULL)
 
 is.indicator <- function(x){
 
-  if( sort(unique(x)) != c(0,1)){
+  if( all.equal(sort(unique(x)), c(0,1))){
     out <- TRUE
   }else{
     out <- FALSE

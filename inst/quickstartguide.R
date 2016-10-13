@@ -17,7 +17,7 @@ AIPWmeasures( time = CCHsimdata$xi, event = CCHsimdata$di,
                    smoothing.par = 0.9,
                    calculate.sd  = TRUE,
                    pnf.threshold = 0.85,
-                   pcf.threshold = 0.8)
+                   pcf.threshold = 0.2)
 
 # true ipw
 

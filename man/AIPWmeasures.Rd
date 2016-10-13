@@ -6,8 +6,8 @@
 \usage{
 AIPWmeasures(time, event, X, subcohort, aug.weights.x = NULL, risk.threshold,
   landmark.time, weight.method = c("Aug", "True"), design = c("CCH", "NCC"),
-  calculate.sd = TRUE, smoothing.par = 0.7, pnf.threshold = NULL,
-  pcf.threshold = NULL, ncc.nmatch = NULL)
+  calculate.sd = TRUE, smoothing.par = 0.7, pnf.threshold = 0.5,
+  pcf.threshold = 0.2, ncc.nmatch = NULL)
 }
 \arguments{
 \item{time}{vector of time to event}
@@ -32,7 +32,7 @@ AIPWmeasures(time, event, X, subcohort, aug.weights.x = NULL, risk.threshold,
 
 \item{smoothing.par}{nearest neighbor smoothing parameter used in locfit (default = 0.7)}
 
-\item{pnf.threshold}{numeric threshold value for which to calculate PNF(bb)}
+\item{pnf.threshold}{value for which to calculate PNF(pnf.threshold). This is the}
 
 \item{pcf.threshold}{numeric threshold value for which to calculate PCF(vv)}
 
@@ -65,7 +65,7 @@ AIPWmeasures( time = CCHsimdata$xi, event = CCHsimdata$di,
              smoothing.par = 0.9,
              calculate.sd  = TRUE,
              pnf.threshold = 0.85,
-             pcf.threshold = 0.8)
+             pcf.threshold = 0.2)
 
 
 #simulated data from a ncc design with nmatch = 2
@@ -81,7 +81,7 @@ AIPWmeasures( time = NCCsimdata$xi, event = NCCsimdata$di,
              smoothing.par = 0.9,
              calculate.sd  = TRUE,
              pnf.threshold = 0.85,
-             pcf.threshold = 0.8,
+             pcf.threshold = 0.2,
              ncc.nmatch = 2)
 
 }
