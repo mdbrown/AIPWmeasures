@@ -1,189 +1,3 @@
-#' Calculate accuracy measures using augmented inverse probability weighted estimates
-#'
-#' Estimates AIPW
-#'
-#' @param
-#'
-#'
-#' @return data.frame with estimates and standard errors.
-#'
-#' @examples
-#'
-#'
-#' @export
-#'
-AIPWmeasures <- function(N, cohortdata,
-                          vp,
-                          typex,
-                          typey,
-                          NBp,
-                          predict.time,
-                          method, design=NULL, AugPos=NULL, CalVar)
-{
-  if (method == 'TrueW'){
-  	if (design == 'CCH')  {
-  		cohortdata$wi = 1/P0HAT.CCH.FUN(cohortdata, type=2, ncch0 = sum(cohortdata$vi==1 & cohortdata$di == 0), ncch1 = sum(cohortdata$vi==1 & cohortdata$di == 1))
-
-       }
-
-  	if (design == 'NCC')  {
-  		cohortdata$wi = ifelse(cohortdata$di==1,1 ,1/P0HAT.NCC.FUN(cohortdata, NULL, nmatch)) }
-
-    subdata <- cohortdata[cohortdata$vi == 1,]
-   #print(sum(subdata$wi))
-   }
-
-   if (method == 'TrueWZ'){
-  		if (design == 'CCH')  {
-
-  		cohortdata$wi = 1/P0HAT.CCH.Z.FUN(cohortdata, type=2);
-      subdata <- cohortdata[cohortdata$vi == 1,]
-  		}
-  		if (design=='NCC') {
-  			subdata <- cohortdata[cohortdata$vi == 1,]
-  		}
-  	}
-   #print(sum(subdata$wi))
-
-
-   if (method == 'AugW') {
-
-   	    if (is.null(AugPos)) {print("Need the positions of the variables used in estimating weights")}
-    	tmp.data0 <- cohortdata[cohortdata$di==0,]
-		tmp.data1 <- cohortdata[cohortdata$di==1,]
-#browser()
-#    input.sm <- tmp.data0[,AugPos]
-
-#		tmp.data0$wi = 1/sm.regression(input.sm,tmp.data0$vi,eval.points=input.sm,eval.grid=FALSE, display =   			"none")$estimate
-    if(design == "NCC"){
-    if(myAugPos[2]==4){
-    tmp.mod <- locfit(vi~lp(xi, y1, nn=nn.par), data = tmp.data0, family = "binomial", link = "logit")
-		}else{
-		  tmp.mod <- locfit(vi~lp(xi, zi, nn = nn.par), data = tmp.data0, family = "binomial", link = "logit")
-
-		}
-
-		tmp.data1$wi = 1
-		tmp.data0$wi <- 1/fitted(tmp.mod, data = tmp.data0)
-
-    }else if(design == "CCH"){
-      if(myAugPos[1]==4){
-
-        tmp.mod <- locfit(vi~lp(y1, nn=nn.par), data = tmp.data0, family = "binomial", link = "logit")
-        tmp.data0$wi <- 1/fitted(tmp.mod, data = tmp.data0)
-
-        tmp.mod <- locfit(vi~lp(y1, nn=nn.par), data = tmp.data1, family = "binomial", link = "logit")
-        tmp.data1$wi <- 1/fitted(tmp.mod, data = tmp.data1)
-
-      }else{
-        tmp.mod <- locfit(vi~lp(zi, nn = nn.par), data = tmp.data0, family = "binomial", link = "logit")
-        tmp.data0$wi <- 1/fitted(tmp.mod, data = tmp.data0)
-
-        tmp.mod <- locfit(vi~lp(zi, nn = nn.par), data = tmp.data1, family = "binomial", link = "logit")
-        tmp.data1$wi <- 1/fitted(tmp.mod, data = tmp.data1)
-      }
-    }
-
-
-		cohortdata <- rbind(tmp.data0, tmp.data1)
-		subdata = cohortdata[cohortdata$vi==1,]
-
-    #print( sum(subdata$wi))
-   }
-
-
-   junk = GetRTdata.SEMIPW.sorted.FUN(subdata, predict.time)  ## data.RT and data are sorted by linear predictor
-   data.RT   <- junk$data.RT
-
-   cutoff = data.RT[,1]
-   ncutoff = length(cutoff)
-   cutoff = sort(cutoff)[-c(1:4,(ncutoff-4):ncutoff)]
-   #cutoff = sort(data.RT[,1])
-   cutpos = sum.I(cutoff,">=", data.RT[,1])
-
-   if (sum(cutpos<=0)>0) {
-   cutoff = cutoff[-c(1:sum(cutpos<=0)) ]}
-   RT.out    <- EstRTall.fixcutoff.FUN(cutoff,data.RT)
-
-  betahat      <- junk$beta
-
-#  TG        <- RT.out[[2]]
-  rho       <- RT.out[[3]]
-  AUC       <- RT.out$AUC
-  IDI       <- RT.out$IDI
-  ITPR      <- RT.out$ITPR
-  IFPR      <- RT.out$IFPR
-
-  RT.out    <- RT.out$RT.out.c
-  RTvp.out  <- NULL
-
-
-  if (!is.null(vp)) {
-  		nvp = length(vp)
-  		RTvp.out = rep(0,nvp)
-    	for (pp in 1:nvp) {
-			RTvp.out[pp] = EstRTvp.FUN(RT.out,vp[pp],typex[pp],typey[pp])
-		}
-  }
-
-  if (!is.null(vv)) {
-	   pcf = EstRTvp.FUN(RT.out,vv,'v','TPR')
-	   pnf = EstRTvp.FUN(RT.out,mytpr,'TPR','v')
-  }
-
-
-NBp.out = NULL
-
-if (!is.null(NBp)) {
-
-  for (jj in 1:length(NBp)) {
-
-    NBp.out=rbind(NBp.out,EstNB.FUN(RT.out,NBp[jj],rho))
-  }
-}
-
-
-  est = c(betahat, AUC, IDI, ITPR,IFPR,RTvp.out,pcf,pnf, NBp.out )
-
-  if (CalVar)  {
-  	    subdata = cbind(junk$data,data.RT[,c(2,1)])
-  		names(subdata)=c("times","status","zi","y1","y2","vi","weights","Sy","linearY")
-        jjunk = Est.Wexp(cutoff,subdata,N,RT.out,predict.time,vp,typex,typey,vv,mytpr)
-        Wexp = cbind(jjunk$Wexp.beta,jjunk$Wexp.AUC,jjunk$Wexp.IDI,jjunk$Wexp.ITPR,jjunk$Wexp.IFPR,jjunk$Wexp.vp,jjunk$Wexp.pcf,jjunk$Wexp.pnf)
-        if (method == 'TrueW') {
-        	if (design == 'CCH') {
-
-        		sd = sqrt(Est.Var.CCH.trueweights(N,Wexp,subdata,subdata$status)[[3]])
-        	}
-        	if (design == 'NCC') {
-        		 tk = sort(subdata$times[cohortdata$status == 1])
-            	 pi.tk = sum.I(tk, "<=", cohortdata$xi)/N
-        		sd = sqrt(Est.Var.NCC.trueweights(N,Wexp,subdata,subdata$status,tk,pi.tk)[[3]])
-        	}
-        }
-
-        if (method == 'TrueWZ') {
-        	    stratum = subdata$zi
-        	    stratum = ifelse(subdata$status==1,stratum+3,stratum)
-              tmpestvar <- Est.Var.CCH.trueweights(N,Wexp,subdata,stratum)
-        		sd = sqrt(tmpestvar[[3]])
-
-
-        }
-
-		if (method == 'AugW') {
-			if (design =='CCH')
-        	{
-
-
-        sd = sqrt(Est.Var.CCH.augweights(N,Wexp,subdata,AugPos,subdata$status)[[3]]) }
-        	if (design =='NCC')
-        	{sd = sqrt(Est.Var.NCC.augweights(N,Wexp,subdata,AugPos)[[3]]) }
-        	     	    }
-
-   c(est,sd,jjunk$err)
-  } else {c(est)}
-}
 
 ## function for calculating expensions
 
@@ -201,7 +15,8 @@ if (!is.null(NBp)) {
 
 #
 Est.Wexp<-
-function(cutoff,data,N,RT.out,predict.time,uu0Vec,typexVec,typeyVec,vv=NULL,mytpr=NULL) {
+function(cutoff,data,N,RT.out,predict.time,uu0Vec,typexVec,typeyVec,
+         vv=NULL,mytpr=NULL, vp) {
 
   if(missing(data))      { stop("Est.Wexp0: data not specified") }
 
@@ -305,15 +120,20 @@ function(cutoff,data,N,RT.out,predict.time,uu0Vec,typexVec,typeyVec,vv=NULL,mytp
     newbeta1=newbeta2=rep(0,np)
     DFc.beta = 	DSt.beta =DTPR.beta = DFPR.beta= DPPV.beta=DNPV.beta=DF.beta=matrix(0,np,ncut)
     DAUC.beta = DITPR.beta = DIFPR.beta = DIDI.beta = DPCF.beta = DPNF.beta = DSt.beta = rep(0,np)
+
+
     DRTvp.beta = matrix(0,np,length(vp))
     err = 0;
+    delta.beta = rep(0.05,np)
+
     for (j in c(1:np)) {
     	newbeta = newbeta1 = newbeta2 = fit$coef
     	newbeta1[j] = newbeta[j] + delta.beta[j]
     	newbeta2[j] = newbeta[j] - delta.beta[j]
 
-    	junk1 = Cal.All.Beta(data,cumhaz.t0,cutoff,newbeta1,Y,vv,mytpr,vp,typex,typey)
-    	junk2 = Cal.All.Beta(data,cumhaz.t0,cutoff,newbeta2,Y,vv,mytpr,vp,typex,typey)
+
+    	junk1 = Cal.All.Beta(data,cumhaz.t0,cutoff,newbeta1,Y,vv,mytpr,vp,typexVec,typeyVec)
+    	junk2 = Cal.All.Beta(data,cumhaz.t0,cutoff,newbeta2,Y,vv,mytpr,vp,typexVec,typeyVec)
     	DTPR.beta[j,] = (junk1$TPR-junk2$TPR)/(2*delta.beta[j])
     	DTPR.beta[j,] =predict(loess(DTPR.beta[j,]~cutoff),cutoff)
 
@@ -408,13 +228,14 @@ function(cutoff,data,N,RT.out,predict.time,uu0Vec,typexVec,typeyVec,vv=NULL,mytp
 	list(cohort.variance=cohort.variance,robust.variance=robust.variance,variance = cohort.variance+strvar)
 }
 
-Est.Var.NCC.trueweights = function(N, Wexp,data,stratum,tk,pi.tk) {
+Est.Var.NCC.trueweights = function(N, Wexp,data,stratum,tk,pi.tk, nmatch) {
+
 	Wexp = as.matrix(Wexp)
  	cohort.variance = colSums(data$weights*(Wexp/N)^2)
  	robust.variance = colSums((data$weights*Wexp/N)^2)
-    adj.tk = as.matrix(sum.I(tk,"<=",data$times,data$weights*Wexp/N*(data$weights-1))/N)
-    var.adj = apply(adj.tk^2/pi.tk^2,2,sum)
-    list(cohort.variance=cohort.variance,robust.variance=robust.variance, variance = robust.variance-var.adj*nmatch)
+  adj.tk = as.matrix(sum.I(tk,"<=",data$times,data$weights*Wexp/N*(data$weights-1))/N)
+  var.adj = apply(adj.tk^2/pi.tk^2,2,sum)
+  list(cohort.variance=cohort.variance,robust.variance=robust.variance, variance = robust.variance-var.adj*nmatch)
 }
 
 EstNB.FUN<-function(RT.out,NBp,rho) {
@@ -428,7 +249,7 @@ EstNB.FUN<-function(RT.out,NBp,rho) {
 
 #################
 ##  for one dimension smoothing: try my own smooth function similar to the above;
-Est.Var.CCH.augweights = function(N,Wexp,data,posXZ,stratum) {
+Est.Var.CCH.augweights = function(N,Wexp,data,AugWeightX,stratum, nn.par) {
  	Wexp = as.matrix(Wexp)
  	cohort.variance = colSums(data$weights*(Wexp/N)^2)
  	robust.variance = colSums((data$weights*Wexp/N)^2)
@@ -441,7 +262,8 @@ Est.Var.CCH.augweights = function(N,Wexp,data,posXZ,stratum) {
 	for (i in 1:nstra) {
 		straWt = data$weights[stratum==stra[i]];		straWexp = as.matrix(Wexp[stratum==stra[i],])
 		ns = length(straWt)
-		straX = data[stratum==stra[i],posXZ]
+
+		straX = AugWeightX[stratum==stra[i]]
 
         bw=1.06*min(sd(straX),IQR(straX)/1.34)*ns^(-bw.power)
         junk = Kern.FUN(straX,straX,bw)
@@ -462,7 +284,7 @@ switch(kern0,
 "gauss"= dnorm(out)/bw)
 }
 
-Est.Var.CCH.augweights = function(N,Wexp,data,posXZ,stratum){
+Est.Var.CCH.augweights = function(N,Wexp,data,AugWeightX,stratum, nn.par){
  	Wexp = as.matrix(Wexp)
  	cohort.variance = colSums(data$weights*(Wexp/N)^2)
  	robust.variance = colSums((data$weights*Wexp/N)^2)
@@ -472,10 +294,15 @@ Est.Var.CCH.augweights = function(N,Wexp,data,posXZ,stratum){
 	strvar =0;
 	np = dim(Wexp)[2]
 	strvar = rep(0,np); straWexp=NULL;
+
 	for (i in 1:nstra) {
-		straWt = data$weights[stratum==stra[i]];		straWexp = as.matrix(Wexp[stratum==stra[i],])
+		straWt = data$weights[stratum==stra[i]];
+		straWexp = as.matrix(Wexp[stratum==stra[i],])
 		ns = length(straWt)
-		straX = data[stratum==stra[i],posXZ]
+	#	straX = AugWeightX[stratum==stra[i]]
+		straX = data[stratum==stra[i],4]
+
+
 		for (j in 1:np) {
 
 
@@ -494,21 +321,25 @@ Est.Var.CCH.augweights = function(N,Wexp,data,posXZ,stratum){
 
 ################
 ##################
-Est.Var.NCC.augweights = function(N,Wexp,data,posXZ) {
+Est.Var.NCC.augweights = function(N,Wexp,data,AugWeightX, nn.par) {
  	Wexp = as.matrix(Wexp)
  	cohort.variance = colSums(data$weights*(Wexp/N)^2)
  	robust.variance = colSums((data$weights*Wexp/N)^2)
  	## strata by cases and conrols
+
 
 	np = dim(Wexp)[2]
 	strvar = rep(0,np); straWexp=NULL;
 		straWt = data$weights[data$status==0];
 		straWexp = as.matrix(Wexp[data$status==0,])
 		ns = length(straWt)
-		straX = data[data$status==0,posXZ]
+		straX = AugWeightX[data$status==0]
+		times = data$times[data$status==0]
+#		browser()
 		for (j in 1:np) {
 
-      tmp <- data.frame("Y" = straWexp[,j]/N, straX)
+      tmp <- data.frame("Y" = straWexp[,j]/N, "times" = times, "y1" = straX)
+
 		  musR = fitted(locfit(straWexp[,j]/N~lp(times, y1, nn = nn.par), data = tmp), data = tmp)
 
 		#	musR = sm.regression(straX,straWexp[,j]/N,eval.points=straX,eval.grid=FALSE,display = "none")$estimate
@@ -529,7 +360,7 @@ Est.Var.NCC.augweights = function(N,Wexp,data,posXZ) {
 #### function for point estimation
 
 
-GetRTdata.SEMIPW.sorted.FUN = function(data,predict.time) {
+GetRTdata.SEMIPW.sorted.FUN = function(data,predict.time, AugWeightX) {
 
 
   Sy = EST.Sy.SEMIPW(data,predict.time)
@@ -537,17 +368,19 @@ GetRTdata.SEMIPW.sorted.FUN = function(data,predict.time) {
   beta    <- Sy[[1]]
   linearY <- Sy[[3]]
   ooo = order(linearY)
+
   data.RT <- cbind(linearY, Sy[[2]], data$wi)[ooo,]
 
   Fck <- sum.I(data.RT[,1], ">=", data.RT[,1], data.RT[,3])/sum(data.RT[,3])
 
   data.RT <- cbind(data.RT[,-c(3)],Fck)
 
-  list(beta = beta, data.RT = data.RT, data=data[ooo,])
+  list(beta = beta, data.RT = data.RT, data=data[ooo,], AugWeightX = AugWeightX[ooo])
 }
 
 
 EST.Sy.SEMIPW<-function(data, predict.time) {
+
   Y.old  <- as.matrix(data[,!is.element(names(data), c("di", "zi", "xi", "wi", "vi"))])
 
   data <- data[order(-data$xi),]
@@ -569,7 +402,9 @@ EST.Sy.SEMIPW<-function(data, predict.time) {
 }
 
 Cal.All.Beta=function(data,cumhaz.t0,cutoff,beta,Y,v,tpr,vp=NULL,typex=NULL,typey=NULL) {
- 	    linearY = c(Y%*%beta)
+
+
+  linearY = c(Y%*%beta)
  		rrk     =  exp(linearY)
     	Fyk  = sum.I(linearY, ">=", linearY, data$weights)/sum(data$weights)
     	nY = length(linearY)
@@ -615,50 +450,6 @@ Cal.All.Beta=function(data,cumhaz.t0,cutoff,beta,Y,v,tpr,vp=NULL,typex=NULL,type
 
   		list(TPR=TPR,FPR=FPR,PPV=PPV,NPV=NPV,Fyk=Fyk[cutpos],St = St0, IDI = IDI,ITPR = ITPR, IFPR=IFPR,AUC=AUC,PCF=pcf,PNF = pnf,RTvp = RTvp.out)
  }
-
- Cal.All.Dbeta = function(data,cumhaz.t0,cutoff,betahat,delta.beta,Y,v,tpr,vp=NULL,typex=NULL,typey=NULL) {
-
- 	np = length(betahat)
- 	ncut = length(cutoff)
-    newbeta1=newbeta2=rep(0,np)
-    DFc.beta = 	DSt.beta =DTPR.beta = DFPR.beta= DPPV.beta=DNPV.beta=DF.beta=matrix(0,np,ncut)
-    DAUC.beta = DITPR.beta = DIFPR.beta = DIDI.beta = DPCF.beta = DPNF.beta = DSt.beta = rep(0,np)
-    DRTvp.beta = matrix(0,np,length(vp))
-    err = 0;
-    for (j in c(1:np)) {
-    	newbeta = newbeta1 = newbeta2 = betahat
-    	newbeta1[j] = newbeta[j] + delta.beta[j]
-    	newbeta2[j] = newbeta[j] - delta.beta[j]
-
-    	junk1 = Cal.All.Beta(data,cumhaz.t0,cutoff,newbeta1,Y,vv,mytpr,vp,typex,typey)
-    	junk2 = Cal.All.Beta(data,cumhaz.t0,cutoff,newbeta2,Y,vv,mytpr,vp,typex,typey)
-    	DTPR.beta[j,] = (junk1$TPR-junk2$TPR)/(2*delta.beta[j])
-    	DTPR.beta[j,] =predict(loess(DTPR.beta[j,]~cutoff),cutoff)
-
-       	DFPR.beta[j,] = (junk1$FPR-junk2$FPR)/(2*delta.beta[j])
-       	DFPR.beta[j,] =predict(loess(DFPR.beta[j,]~cutoff),cutoff)
-
-       	DPPV.beta[j,] = (junk1$PPV-junk2$PPV)/(2*delta.beta[j])
-    	DPPV.beta[j,] =predict(loess(DPPV.beta[j,]~cutoff),cutoff)
-
-    	DNPV.beta[j,] = (junk1$NPV-junk2$NPV)/(2*delta.beta[j])
-    	DNPV.beta[j,] =predict(loess(DNPV.beta[j,]~cutoff),cutoff)
-
-        DFc.beta[j,] = (junk1$Fyk-junk2$Fyk)/(2*delta.beta[j])
-    	DFc.beta[j,] =predict(loess(DF.beta[j,]~cutoff),cutoff)
-        err = err + ifelse(length(junk1$TPR)==length(junk2$TPR),0,1)
-
-        DSt.beta[j] = (junk1$St-junk2$St)/(2*delta.beta[j])
-        DAUC.beta[j] = (junk1$AUC-junk2$AUC)/(2*delta.beta[j])
-        DIDI.beta[j] = (junk1$IDI-junk2$IDI)/(2*delta.beta[j])
-        DITPR.beta[j] = (junk1$ITPR-junk2$ITPR)/(2*delta.beta[j])
-        DIFPR.beta[j] = (junk1$IFPR-junk2$IFPR)/(2*delta.beta[j])
-        DPCF.beta[j] = (junk1$PCF-junk2$PCF)/(2*delta.beta[j])
-        DPNF.beta[j] = (junk1$PNF-junk2$PNF)/(2*delta.beta[j])
-        DRTvp.beta[j,] = (junk1$RTvp-junk2$RTvp)/(2*delta.beta[j])
-    }
-    list(DTPR.beta=DTPR.beta,DFPR.beta=DFPR.beta,DPPV.beta=DPPV.beta,DNPV.beta=DNPV.beta,DF.beta=DF.beta,DSt.beta = DSt.beta,DIDI.beta = DIDI.beta,DITPR.beta = DITPR.beta, DIFPR.beta=DIFPR.beta,DAUC.beta=AUC.beta,DPCF.beta=DPCF.beta,DPNF.beta = DPNF.betea,DRTvp.beta = DRTvp.beta)
-}
 
 
 ################ individual components
@@ -825,6 +616,9 @@ P0HAT.CCH.Z.FUN <- function(cohortdata, type = 2)
 
   p0hat
 }
+
+
+
 ## Sampling Weights
 #  include both finite and quota sample
 P0HAT.NCC.FUN <- function(data, Rstar.size = NULL, nmatch)
@@ -1008,4 +802,15 @@ dAcc.FUN <- function(uu0, uu=SE.yy, A.uu = Sp.yy, bw=NULL)
     if(is.null(bw)){bw=1.06*min(sd(uu),IQR(uu)/1.34)*n.uu^(-bw.power)}
     Ki.u0 = Kern.FUN(uu0, uu[-1], bw) ## n.uu x n.u0
     c(t(A.uu[-1]-A.uu[-n.uu])%*%Ki.u0)
+}
+
+is.indicator <- function(x){
+
+  if( sort(unique(x)) != c(0,1)){
+    out <- TRUE
+  }else{
+    out <- FALSE
   }
+
+  out
+}

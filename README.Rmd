@@ -1,0 +1,92 @@
+---
+title: "README"
+author: "Marshall Brown"
+date: "October 13, 2016"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## AIPWmeasures
+
+This package includes a function `AIPWmeasures` that calculates standard measures of predictive accuracy commonly used in biomarker validation studies. More specifically, this function calculates estimates using data from two-phase sampling designs ('case-cohort' and 'nested case-control') using two different methods, a standard ipw estimator (true ipw) and a novel method (augmented ipw) that has been shown to be more efficient in some contexts. See the manuscript "Improving Efficiency in Biomarker Incremental Value Evaluation under Two-phase Study Designs" by Zheng et. al. for more details.
+
+## Install the package 
+```{r, eval = FALSE}
+if (!require("devtools")) install.packages("devtools")
+devtools::install_github("AIPWmeasures", "mdbrown")
+```
+
+## Quick Example 
+
+```{r}
+library(AIPWmeasures)
+data(CCHsimdata)
+
+predict.time <- 0.75
+
+## augmented ipw
+AIPWmeasures( time = CCHsimdata$xi, event = CCHsimdata$di,
+              X = cbind(CCHsimdata$y1, CCHsimdata$y2),
+               subcohort = CCHsimdata$vi,
+                   aug.weights.x =   CCHsimdata$y1,
+                   risk.threshold  =  c(.05, .3),
+                   landmark.time = predict.time,
+                   weight.method = 'Aug',
+                   design = "CCH",
+                   smoothing.par = 0.9,
+                   calculate.sd  = TRUE,
+                   pnf.threshold = 0.85,
+                   pcf.threshold = 0.8)
+
+# true ipw
+AIPWmeasures( time = CCHsimdata$xi, event = CCHsimdata$di,
+              X = cbind(CCHsimdata$y1, CCHsimdata$y2),
+              subcohort = CCHsimdata$vi,
+              #aug.weights.x =   CCHsimdata$y1,
+              risk.threshold  =  c(.05, .3),
+              landmark.time = predict.time,
+              weight.method = 'True',
+              design = "CCH",
+              smoothing.par = 0.9,
+              calculate.sd  = TRUE,
+              pnf.threshold = 0.85,
+              pcf.threshold = 0.8,
+              ncc.nmatch = 2)
+
+#simulated data from a ncc design with nmatch = 2
+data("NCCsimdata")
+AIPWmeasures( time = NCCsimdata$xi, event = NCCsimdata$di,
+                    X = cbind(NCCsimdata$y1, NCCsimdata$y2),
+                    subcohort = NCCsimdata$vi,
+                    aug.weights.x =   NCCsimdata$y1,
+                    risk.threshold  =  c(.01, .03),
+                    landmark.time = predict.time,
+                    weight.method = 'Aug',
+                    design = "NCC",
+                    smoothing.par = 0.9,
+                    calculate.sd  = TRUE,
+                    pnf.threshold = 0.85,
+                    pcf.threshold = 0.8,
+                    ncc.nmatch = 2)
+
+#true ipw
+AIPWmeasures( time = NCCsimdata$xi, event = NCCsimdata$di,
+                    X = cbind(NCCsimdata$y1, NCCsimdata$y2),
+                    subcohort = NCCsimdata$vi,
+                    risk.threshold  =  c(.01, .03),
+                    landmark.time = predict.time,
+                    weight.method = 'True',
+                    design = "NCC",
+                    smoothing.par = 0.9,
+                    calculate.sd  = TRUE,
+                    pnf.threshold = 0.85,
+                    pcf.threshold = 0.8,
+                    ncc.nmatch = 2)
+
+
+```

@@ -1,9 +1,19 @@
 Package: AIPWmeasures
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Estimate measures of predictive accuracy using augmented inverse
+    probability weights for two-phase biomarker validation studies
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
+Author: Marshall Brown and Yingye Zheng
+Maintainer: Marshall Brown <mdbrown@fhcrc.org>
+URL: https://github.com/mdbrown/AIPWmeasures
+Description: This package includes functions to estimate standard measures
+    of predictive accuracy commonly used in biomarker validation studies. More
+    specifically, we provide estimates using data from two-phase sampling designs
+    ('case-cohort' and 'nested case-control') using two different methods, a
+    standard ipw estimator (true ipw) and a novel method (augmented ipw) that has
+    been shown to be more efficient in some contexts. See the manuscript "Improving
+    Efficiency in Biomarker Incremental Value Evaluation under Two-phase Study
+    Designs" by Zheng et. al. for more details.
+License: GPL-2
 LazyData: TRUE
+RoxygenNote: 5.0.1
