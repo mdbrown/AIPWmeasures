@@ -32,9 +32,9 @@ AIPWmeasures(time, event, X, subcohort, aug.weights.x = NULL, risk.threshold,
 
 \item{smoothing.par}{nearest neighbor smoothing parameter used in locfit (default = 0.7)}
 
-\item{pnf.threshold}{value for which to calculate PNF(pnf.threshold). This is the}
+\item{pnf.threshold}{value used to calculate proportion needed to follow (PNF) such that pnf.threshold percent of the cases are classified high risk.}
 
-\item{pcf.threshold}{numeric threshold value for which to calculate PCF(vv)}
+\item{pcf.threshold}{value used to calculate proportion of cases followed (PCF) if pcf.threshold percent of the population are classified high risk.}
 
 \item{ncc.nmatch}{For design = "NCC", specify the number of controls matched per case.}
 }

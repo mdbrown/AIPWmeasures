@@ -6,6 +6,8 @@ This package includes a function `AIPWmeasures` that calculates standard measure
 
 ## Install the package 
 
+You can install the development version of the package directly from github using the R package `devtools`. The package will be added to CRAN after further testing. 
+
 ```r
 if (!require("devtools")) install.packages("devtools")
 devtools::install_github("AIPWmeasures", "mdbrown")
